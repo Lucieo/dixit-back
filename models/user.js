@@ -21,11 +21,7 @@ const userSchema = new Schema({
     },
     icon: {
         type: String,
-        default: 'tag_faces'
-    },
-    iconColor: {
-        type: String,
-        default: '#000000'
+        default: 'monster1'
     }
 })
 

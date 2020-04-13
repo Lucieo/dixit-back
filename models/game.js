@@ -18,14 +18,30 @@ const gameSchema = new Schema({
         type: String,
         default: "new"
     },
-    sketchbooks:[{
-        type: Schema.Types.ObjectId,
-        ref: 'Sketchbook'
-    }],
     turn:{
         type: String,
         default:0
     },
+    turnVotes:[{
+        type: Schema.Types.ObjectId,
+        ref: 'Action',
+    }],
+    turnCards:[{
+        type: Schema.Types.ObjectId,
+        ref: 'Action',
+    }],
+    currentWord:{
+        type: String
+    }
+    ,
+    distributedCards:[{
+        type: Schema.Types.ObjectId,
+        ref: 'Card'
+    }],
+    decks:[{
+        type: Schema.Types.ObjectId,
+        ref: 'Deck'
+    }],
     createdAt: { 
         type: Date, 
         expires: 900,

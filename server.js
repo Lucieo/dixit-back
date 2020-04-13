@@ -3,15 +3,17 @@ const express = require('express');
 const {
   User,
 } = require('./models');
+const path = require('path')
 const { typeDefs, resolvers } = require('./schema');
 const mongoose = require('mongoose');
-var cors = require('cors');
 const jwt = require('jsonwebtoken');
 const { json } = require('express');
-const { gameCleaningJob } = require('./cron-jobs')
-const debug = require('debug')('esquisse:server');
+const debug = require('debug')('dixit:server');
+const addCards = require('./addCards');
 
 const app = express();
+
+app.use('/images', express.static(path.join(__dirname, 'images')));
 
 
 app.use(json({ limit: '2mb' }))
@@ -19,12 +21,6 @@ const {
   MONGO_URI
 } = process.env;
 debug(MONGO_URI)
-debug(process.env.FRONT_URL)
-// const corsOptions = {
-//     origin: process.env.FRONT_URL,
-//     credentials: true,
-//   };
-// app.use(cors(corsOptions));
 
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -74,13 +70,13 @@ module.exports = {
 }
 
 
+//addCards()
+
 if (require.main === module) {
   const http = require('http');
   server.applyMiddleware({ app })
   const httpServer = http.createServer(app);
   server.installSubscriptionHandlers(httpServer);
-
-  //gameCleaningJob();
 
   mongoose
     .connect(MONGO_URI)

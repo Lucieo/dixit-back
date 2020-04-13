@@ -1,15 +1,10 @@
 
 const bcrypt = require('bcrypt');
-// const {
-//   User,
-//   Game,
-//   Sketchbook,
-//   Page
-// } = require('../models');
 const User = require('../models/user');
 const Game = require('../models/game');
-const Sketchbook = require('../models/sketchbook');
-const Page = require('../models/page');
+const Deck = require('../models/deck');
+const Card = require('../models/card');
+const Action = require('../models/action')
 
 const jwt = require('jsonwebtoken');
 const { withFilter } = require('apollo-server-express');
@@ -25,42 +20,18 @@ const resolvers = {
       return user
     },
     getGameInfo: async(parent, {gameId}, {user})=>{
-      const game = await Game.findById(gameId).populate('players').populate('sketchbooks');
+      const game = await Game.findById(gameId)
+      .populate('players');
       return game
     },
-    getSketchbookInfo: async(parent, {sketchbookId}, context)=>{
-      const sketchbook = await Sketchbook.findById(sketchbookId).populate('pages');
-      return sketchbook;
-    },
-    getAllSketchbooks: async(parent, {gameId}, context)=>{
-      const endOfGame= await Game
-      .findById(gameId)
-      .populate({
-        path:'sketchbooks',
-        populate:{
-          path:"pages",
-          populate:{
-            path:"creator"
-          }
-        },
+    getDeck: async(parent, {gameId}, {user})=>{
+      console.log(gameId)
+      const deck = await Deck.findOne({
+        gameId,
+        owner:user
       })
-      return endOfGame.sketchbooks
-    },
-    getLastUserGames: async(parent, {}, context)=>{
-      const games = await Game
-      .find({players:{$all:[context.user.id]},status:"over"}, {status:1})
-      .sort({_id:-1})
-      .populate({
-        path:'sketchbooks',
-        populate:{
-          path:"pages",
-          populate:{
-            path:"creator"
-          }
-        },
-      })
-      .limit(1)
-      return games
+      .populate('cards')
+      return deck
     }
   },
   Mutation: {
@@ -104,11 +75,10 @@ const resolvers = {
         user,
       }
     },
-    modifyUser: (parent, {name, icon, iconColor}, context)=>{
+    modifyUser: (parent, {name, icon}, context)=>{
       const user = context.user;
       user.name= name;
       user.icon = icon;
-      user.iconColor = iconColor;
       user.save();
       return user;
     },
@@ -159,61 +129,57 @@ const resolvers = {
       return game
     },
     changeGameStatus: async (parent, {gameId, newStatus}, context)=>{
-      const game = await Game.findById(gameId).populate('players').populate('sketchbooks');
+      const game = await Game.findById(gameId)
+      .populate('players')
+      .populate('decks');
       if(game.status!==newStatus && context.user.id===game.creator.toString()){
         game.status = newStatus;
         if(newStatus==="active"){
+          let selectedCards = await Card.find({'_id': {$nin: game.distributedCards}});
+          shuffle = function(v){
+            for(var j, x, i = v.length; i; j = parseInt(Math.random() * i), x = v[--i], v[i] = v[j], v[j] = x);
+            return v;
+          };
+          selectedCards=shuffle(selectedCards)
           game.players.forEach(
-            creator=>{
-              const sketchbook = new Sketchbook({
-                creator,
-                gameId
+            owner=>{
+              const userCards = selectedCards.splice(0,5)
+              const deck = new Deck({
+                owner,
+                gameId,
+                cards : userCards
               });
-              sketchbook.save()
-              game.sketchbooks.push(sketchbook)
+              deck.save()
+              game.decks.push(deck);
             }
           )
-          setTimeout(() =>{
-            pubsub.publish("TIME_TO_SUBMIT", {timeToSubmit: {id: gameId}});
-
-          }, 60000);
-        }
-        else if(newStatus==="over"){
-          SubmitQueue.remove({gameId});
         }
         game.save();
-        //debug('GAME OBJ SENT ', game)
         pubsub.publish("GAME_UPDATE", { gameUpdate: game});
       }
       return game;
     },
-    submitPage: async(parent, {sketchbookId, content, pageType, gameId}, {user})=>{
-      const sketchbook = await Sketchbook.findById(sketchbookId);
-      debug("SUBMIT PAGE CALLED")
-      const pageExists = await Page.findOne({creator:user, sketchbook:sketchbookId})
-      if(!pageExists){
-        debug('NO PAGE FOUND GO AHEAD SAVE NEW ONE')
-        const page = new Page({
-          content,
-          pageType,
-          creator: user,
-          sketchbook: sketchbookId
-        });
-        await page.save();
-        debug('NEW PAGE HAS BEEN SAVED FOR CONTENT ', content)
-        sketchbook.pages.push(page);
-        await sketchbook.save();
+    selectCard:async (parent, {gameId, cardId, actionType}, {user})=>{
+        const action = new Action({
+          owner: user,
+          actionType,
+          cardId,
+          gameId
+        })
+        await action.save()
 
-        return {
-          id : page.id
+        const game = await Game.findById(gameId);
+        if(actionType==="submitCard"){
+          //Select Card Action
+          game.turnDeck.push(action)
         }
-      }
-      else{
-        Game.checkCompletedTurn(gameId)
-      }
-      return{
-        id: null
-      }
+        else{
+          //Vote for Card Acton
+          game.turnVotes.push(action)
+        }
+        game.save()
+        return {gameId, actionType, status:"Action saved"}
+
     }
   },
   Subscription: {
@@ -238,18 +204,30 @@ const resolvers = {
         },
       )
     },
-    timeToSubmit: {
-      subscribe: withFilter(
-        ()=>{
-          debug('TIME TO SUBMIT LISTENING CLIENT')
-          return pubsub.asyncIterator(["TIME_TO_SUBMIT"])
-        },
-        (payload, variables) => {
-          debug('TIME_TO_SUBMIT should pass ', payload.timeToSubmit.id === variables.gameId)
-         return payload.timeToSubmit.id === variables.gameId;
-        },
-      )
-    }
+    // gameFlow: {
+    //   subscribe: withFilter(
+    //     () => {
+    //       return pubsub.asyncIterator(["GAME_FLOW"])
+    //     },
+    //     (payload, variables) => {
+    //       debug('GAME FLOW CALLED should pass ', payload.gameFlow.id === variables.gameId)
+    //      return payload.gameFlow.id === variables.gameId;
+    //     },
+    //   )
+    // },
+    
+  //   timeToSubmit: {
+  //     subscribe: withFilter(
+  //       ()=>{
+  //         debug('TIME TO SUBMIT LISTENING CLIENT')
+  //         return pubsub.asyncIterator(["TIME_TO_SUBMIT"])
+  //       },
+  //       (payload, variables) => {
+  //         debug('TIME_TO_SUBMIT should pass ', payload.timeToSubmit.id === variables.gameId)
+  //        return payload.timeToSubmit.id === variables.gameId;
+  //       },
+  //     )
+  //   }
   },
 };
 

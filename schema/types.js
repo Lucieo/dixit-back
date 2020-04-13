@@ -6,29 +6,27 @@ type User {
     name: String
     email: String
     icon: String
-    iconColor: String
 }
 type LoginResponse {
     token: String
     user: User
 }
-type Sketchbook {
-    id: ID
-    creator: ID
-    pages: [Page]
+type Deck{
+    gameId: ID
+    owner: User
+    cards: [Card]
 }
-type Page{
-    content: String
-    pageType: String
-    creator: User
+type Card{
+    id: ID
+    fileName: String
 }
 type Game{
     id: ID
     status: String
     creator: ID
     players: [User]
-    sketchbooks: [Sketchbook]
     turn: Int
+    decks: [ID]
 }
 type CreatedGame{
     id:ID
@@ -38,34 +36,29 @@ type PlayerModifyResponse{
     gameId: ID,
     creator: ID
 }
-type submitPageResponse{
-    id: ID
-}
-type allGamesResponse{
-    sketchbooks: [Sketchbook]
-    id: ID
+type submitCardResponse{
+    status: String
+    gameId: ID
+    actionType: String
 }
 type Query {
     currentUser: User!,
     getGameInfo(gameId: ID): Game!
-    getSketchbookInfo(sketchbookId: ID!): Sketchbook!
-    getAllSketchbooks(gameId: ID!): [Sketchbook]
-    getLastUserGames: [allGamesResponse]
+    getDeck(gameId: ID): Deck!
 }
 type Mutation {
     signup(name: String!, email: String!, password: String!): User!
     login(email: String!, password: String!): LoginResponse!
-    modifyUser(name: String!, icon: String!, iconColor: String!): User!
+    modifyUser(name: String!, icon: String!): User!
     createGame: CreatedGame
     joinGame(gameId: ID!): Game
     leaveGame(gameId: ID!): Game
     changeGameStatus(gameId: ID!, newStatus: String!): Game
-    submitPage(sketchbookId: ID!, gameId: ID!, content: String! pageType: String!): submitPageResponse!
+    selectCard(gameId:ID!, cardId:ID!, actionType: String!): submitCardResponse
 }
 type Subscription {
     playerUpdate(gameId: ID!): PlayerModifyResponse
     gameUpdate(gameId: ID!): Game
-    timeToSubmit(gameId: ID!): submitPageResponse
 }
 `;
 
