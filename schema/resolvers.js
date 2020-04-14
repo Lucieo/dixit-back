@@ -21,7 +21,19 @@ const resolvers = {
     },
     getGameInfo: async(parent, {gameId}, {user})=>{
       const game = await Game.findById(gameId)
-      .populate('players');
+      .populate('players')
+      .populate({
+        path:'turnDeck',
+        populate:{
+          path: "card"
+        }
+      })
+      .populate({
+        path:'turnVotes',
+        populate:{
+          path: "card"
+        }
+      })
       return game
     },
     getDeck: async(parent, {gameId}, {user})=>{
@@ -136,14 +148,14 @@ const resolvers = {
         game.status = newStatus;
         if(newStatus==="active"){
           let selectedCards = await Card.find({'_id': {$nin: game.distributedCards}});
-          shuffle = function(v){
+          const shuffle = function(v){
             for(var j, x, i = v.length; i; j = parseInt(Math.random() * i), x = v[--i], v[i] = v[j], v[j] = x);
             return v;
           };
           selectedCards=shuffle(selectedCards)
           game.players.forEach(
             owner=>{
-              const userCards = selectedCards.splice(0,5)
+              const userCards = selectedCards.splice(0,6)
               const deck = new Deck({
                 owner,
                 gameId,
@@ -159,12 +171,42 @@ const resolvers = {
       }
       return game;
     },
+    initGame: async (parent, {gameId,  cardId, currentWord}, {user})=>{
+      const action = new Action({
+        owner: user,
+        actionType:"submitCard",
+        card:cardId,
+        game:gameId
+      })
+      await action.save()
+      const game = await Game
+      .findById(gameId)
+      .populate('players')
+      .populate({
+        path:'turnDeck',
+        populate:{
+          path: "card"
+        }
+      })
+      .populate({
+        path:'turnVotes',
+        populate:{
+          path: "card"
+        }
+      });
+      game.turnDeck.push(action)
+      game.currentWord = currentWord
+      await game.save()
+      pubsub.publish("GAME_UPDATE", { gameUpdate: game});
+      return {gameId, step:"init", status:"Game initiated"}
+
+    },
     selectCard:async (parent, {gameId, cardId, actionType}, {user})=>{
         const action = new Action({
           owner: user,
           actionType,
-          cardId,
-          gameId
+          card:cardId,
+          game:gameId
         })
         await action.save()
 
@@ -178,7 +220,10 @@ const resolvers = {
           game.turnVotes.push(action)
         }
         game.save()
-        return {gameId, actionType, status:"Action saved"}
+        return {gameId, step:actionType, status:"Action saved"}
+
+    },
+    launchGameAction:async (parent, {gameId, stepType}, {user})=>{
 
     }
   },

@@ -26,7 +26,7 @@ const gameSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'Action',
     }],
-    turnCards:[{
+    turnDeck:[{
         type: Schema.Types.ObjectId,
         ref: 'Action',
     }],
@@ -42,11 +42,11 @@ const gameSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'Deck'
     }],
-    createdAt: { 
-        type: Date, 
-        expires: 900,
-        default: Date.now 
-    }
+    // createdAt: { 
+    //     type: Date, 
+    //     expires: 150000,
+    //     default: Date.now 
+    // }
 })
 
 gameSchema.methods.currentTurnIsOver = function() {
@@ -97,6 +97,10 @@ gameSchema.statics.checkCompletedTurn = async function (gameId) {
       debug('ALL RESPONSES RECEIVED DONE')
       this.publishTimeToSubmit(game);
     }
+}
+
+gameSchema.statics.evaluateTurn = async function(gameId){
+    console.log("evaluate")
 }
 
 module.exports = mongoose.model('Game', gameSchema)

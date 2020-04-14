@@ -14,11 +14,11 @@ const deckSchema = new Schema({
         type: Schema.Types.ObjectId,
         ref: 'Card'
     }],
-    createdAt: { 
-        type: Date, 
-        expires: 1000,
-        default: Date.now
-    }
+    // createdAt: { 
+    //     type: Date, 
+    //     expires: 150000,
+    //     default: Date.now
+    // }
 })
 
 

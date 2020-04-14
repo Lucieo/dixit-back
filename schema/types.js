@@ -26,7 +26,9 @@ type Game{
     creator: ID
     players: [User]
     turn: Int
-    decks: [ID]
+    turnDeck: [Action]
+    turnVotes: [Action]
+    currentWord: String
 }
 type CreatedGame{
     id:ID
@@ -41,6 +43,15 @@ type submitCardResponse{
     gameId: ID
     actionType: String
 }
+type gameStepResponse{
+    status: String
+    gameId: ID
+    stepType: String
+}
+type Action{
+    owner: ID
+    card: Card
+}
 type Query {
     currentUser: User!,
     getGameInfo(gameId: ID): Game!
@@ -54,7 +65,9 @@ type Mutation {
     joinGame(gameId: ID!): Game
     leaveGame(gameId: ID!): Game
     changeGameStatus(gameId: ID!, newStatus: String!): Game
-    selectCard(gameId:ID!, cardId:ID!, actionType: String!): submitCardResponse
+    initGame(gameId:ID!, currentWord:String!, cardId:ID!): gameStepResponse
+    selectCard(gameId:ID!, cardId:ID!, actionType: String!): gameStepResponse
+    launchGameAction(gameId:ID!, stepType: String!): gameStepResponse
 }
 type Subscription {
     playerUpdate(gameId: ID!): PlayerModifyResponse

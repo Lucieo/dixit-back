@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
 const actionSchema = new Schema({
-    gameId:{
+    game:{
         type: Schema.Types.ObjectId,
         ref: 'Game'
     },
@@ -13,10 +13,15 @@ const actionSchema = new Schema({
     actionType: {
         type: String
     },
-    cardId:{
+    card:{
         type: Schema.Types.ObjectId,
         ref: 'Card'
-    }
+    },
+    // createdAt: { 
+    //     type: Date, 
+    //     expires: 150000,
+    //     default: Date.now
+    // }
 })
 
 
