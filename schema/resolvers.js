@@ -37,7 +37,6 @@ const resolvers = {
       return game
     },
     getDeck: async(parent, {gameId}, {user})=>{
-      console.log(gameId)
       const deck = await Deck.findOne({
         gameId,
         owner:user
@@ -172,10 +171,11 @@ const resolvers = {
       return game;
     },
     initGame: async (parent, {gameId,  cardId, currentWord}, {user})=>{
+      const card = await Card.findById(cardId)
       const action = new Action({
-        owner: user,
+        owner: user.id,
         actionType:"submitCard",
-        card:cardId,
+        card,
         game:gameId
       })
       await action.save()
@@ -202,10 +202,11 @@ const resolvers = {
 
     },
     selectCard:async (parent, {gameId, cardId, actionType}, {user})=>{
+        const card = await Card.findById(cardId)
         const action = new Action({
-          owner: user,
+          owner: user.id,
           actionType,
-          card:cardId,
+          card,
           game:gameId
         })
         await action.save()
@@ -219,12 +220,38 @@ const resolvers = {
           //Vote for Card Acton
           game.turnVotes.push(action)
         }
-        game.save()
+        await game.save()
+        pubsub.publish("GAME_ACTION", { gameAction:{
+          gameId,
+          action,
+          actionType
+        }});
         return {gameId, step:actionType, status:"Action saved"}
 
     },
-    launchGameAction:async (parent, {gameId, stepType}, {user})=>{
-
+    launchGameStep:async (parent, {gameId, step, turnMaster}, {user})=>{
+      if(step==="launchEvaluation"){
+        console.log('evaluate')
+        const game = await Game.evaluateTurn(gameId, turnMaster)
+      }
+      else{
+        const game = await Game.findById(gameId)
+        .populate('players')
+        .populate({
+          path:'turnDeck',
+          populate:{
+            path: "card"
+          }
+        })
+        .populate({
+          path:'turnVotes',
+          populate:{
+            path: "card"
+          }
+        });
+      }
+      pubsub.publish("GAME_UPDATE", { gameUpdate: game});
+      return game
     }
   },
   Subscription: {
@@ -249,30 +276,18 @@ const resolvers = {
         },
       )
     },
-    // gameFlow: {
-    //   subscribe: withFilter(
-    //     () => {
-    //       return pubsub.asyncIterator(["GAME_FLOW"])
-    //     },
-    //     (payload, variables) => {
-    //       debug('GAME FLOW CALLED should pass ', payload.gameFlow.id === variables.gameId)
-    //      return payload.gameFlow.id === variables.gameId;
-    //     },
-    //   )
-    // },
-    
-  //   timeToSubmit: {
-  //     subscribe: withFilter(
-  //       ()=>{
-  //         debug('TIME TO SUBMIT LISTENING CLIENT')
-  //         return pubsub.asyncIterator(["TIME_TO_SUBMIT"])
-  //       },
-  //       (payload, variables) => {
-  //         debug('TIME_TO_SUBMIT should pass ', payload.timeToSubmit.id === variables.gameId)
-  //        return payload.timeToSubmit.id === variables.gameId;
-  //       },
-  //     )
-  //   }
+    gameAction: {
+      subscribe: withFilter(
+        () => {
+          console.log('GAME ACTION SUBSCRIPTION DONE')
+          return pubsub.asyncIterator(["GAME_ACTION"])
+        },
+        (payload, variables) => {
+          console.log('GAME ACTION CALLED should pass ', payload.gameAction.gameId === variables.gameId)
+         return payload.gameAction.gameId === variables.gameId;
+        },
+      )
+    },
   },
 };
 

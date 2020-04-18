@@ -23,6 +23,11 @@ const userSchema = new Schema({
         type: String,
         default: 'monster1'
     }
+    ,
+    totalPoints:{
+        type: Number,
+        default: 0
+    }
 })
 
 

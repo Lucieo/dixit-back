@@ -48,6 +48,11 @@ type gameStepResponse{
     gameId: ID
     stepType: String
 }
+type GameAction{
+    gameId: ID
+    actionType: String
+    action: Action
+}
 type Action{
     owner: ID
     card: Card
@@ -67,11 +72,12 @@ type Mutation {
     changeGameStatus(gameId: ID!, newStatus: String!): Game
     initGame(gameId:ID!, currentWord:String!, cardId:ID!): gameStepResponse
     selectCard(gameId:ID!, cardId:ID!, actionType: String!): gameStepResponse
-    launchGameAction(gameId:ID!, stepType: String!): gameStepResponse
+    launchGameStep(gameId:ID!, step: String!, turnMaster: ID!): Game
 }
 type Subscription {
     playerUpdate(gameId: ID!): PlayerModifyResponse
     gameUpdate(gameId: ID!): Game
+    gameAction(gameId: ID!): GameAction
 }
 `;
 
