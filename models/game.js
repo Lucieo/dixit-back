@@ -1,153 +1,145 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 // const { pubsub } = require('../schema');
-const pubsub = require('../schema/pubsub')
-const _ = require('lodash');
-const debug = require('debug')('esquisse:game');
+const pubsub = require("../schema/pubsub");
+const _ = require("lodash");
+const debug = require("debug")("esquisse:game");
 
 const gameSchema = new Schema({
-    players: [{
-        type: Schema.Types.ObjectId,
-        ref: 'User',
-    }],
+    players: [
+        {
+            type: Schema.Types.ObjectId,
+            ref: "User",
+        },
+    ],
     creator: {
         type: Schema.Types.ObjectId,
-        ref: 'User'
+        ref: "User",
     },
     status: {
         type: String,
-        default: "new"
+        default: "new",
     },
-    turn:{
+    turn: {
         type: String,
-        default:0
+        default: 0,
     },
-    turnVotes:[{
-        type: Schema.Types.ObjectId,
-        ref: 'Action',
-    }],
-    turnDeck:[{
-        type: Schema.Types.ObjectId,
-        ref: 'Action',
-    }],
-    currentWord:{
-        type: String
-    }
-    ,
-    distributedCards:[{
-        type: Schema.Types.ObjectId,
-        ref: 'Card'
-    }],
-    decks:[{
-        type: Schema.Types.ObjectId,
-        ref: 'Deck'
-    }],
-    points:{
-        type: Array
-    }
-    // createdAt: { 
-    //     type: Date, 
+    turnVotes: [
+        {
+            type: Schema.Types.ObjectId,
+            ref: "Action",
+        },
+    ],
+    turnDeck: [
+        {
+            type: Schema.Types.ObjectId,
+            ref: "Action",
+        },
+    ],
+    currentWord: {
+        type: String,
+    },
+    distributedCards: [
+        {
+            type: Schema.Types.ObjectId,
+            ref: "Card",
+        },
+    ],
+    decks: [
+        {
+            type: Schema.Types.ObjectId,
+            ref: "Deck",
+        },
+    ],
+    gamePoints: {
+        type: Array,
+    },
+    turnPoints: {
+        type: Array,
+    },
+    // createdAt: {
+    //     type: Date,
     //     expires: 150000,
-    //     default: Date.now 
+    //     default: Date.now
     // }
-})
+});
 
-// 
+//
 
-gameSchema.statics.evaluateTurn = async function(gameId, turnMaster){
+gameSchema.statics.evaluateTurn = async function (gameId, turnMaster) {
     const game = await this.findById(gameId)
-    .populate({
-        path:'turnDeck',
-        populate:{
-          path: "card"
-        }
-    })
-    .populate({
-        path:'turnVotes',
-        populate:{
-          path: "card"
-        }
-      });
-    
-    const points = []
-    game.players.forEach(player=>{
-        const playerCardId = game.turnDeck.find(card=>card.owner.toString()===player.toString()).card.id;
-        const votesReceived = game.turnVotes.filter(vote=>vote.card.id===playerCardId)
-        if(player.toString()!==turnMaster){
-            //Regular Player
-            points.push({player: player, points: votesReceived.length})
-        }
-        else{
-            //TurnMaster
-            if(votesReceived===0 || votesReceived===game.players.length-1){
-                points.forEach((pointRegistry, index)=>{
-                    if(pointRegistry.player.toString()!==turnMaster){
-                        points[index] = {...pointRegistry, points: pointRegistry.points+2}
-                    }
-                })
+        .populate({
+            path: "turnDeck",
+            populate: {
+                path: "card",
+            },
+        })
+        .populate({
+            path: "turnVotes",
+            populate: {
+                path: "card",
+            },
+        });
+
+    const points = game.players.map((player) => ({ player, points: 0 }));
+    const masterCardId = game.turnDeck.find(
+        (card) => card.owner.toString() === turnMaster
+    );
+    const votesForMaster = game.turnVotes
+        .filter((vote) => vote.card.id === masterCardId)
+        .map((el) => el.owner);
+    const hasMasterWon =
+        votesForMaster > 0 && votesForMaster < game.players.length - 1;
+
+    if (hasMasterWon) {
+        votesForMaster.push(turnMaster);
+        points.forEach((el, idx) => {
+            if (votesForMaster.indexOf(el.player.toString()) > -1) {
+                points[idx] = { ...el, points: el.points + 3 };
             }
-            else{
-                points.forEach((pointRegistry, index)=>{
-                    points[index] = {...pointRegistry, points: pointRegistry.points+3}
-                })
+        });
+    } else {
+        points.forEach((el, idx) => {
+            if (el.player.toString() !== turnMaster) {
+                points[idx] = { ...el, points: el.points + 2 };
             }
+        });
+    }
+
+    console.log("hasMasterWon", hasMasterWon);
+    console.log(points);
+
+    const otherPlayers = game.players.filter(
+        (player) => player.toString() !== turnMaster
+    );
+    console.log("OtherPlayers ", otherPlayers);
+    otherPlayers.forEach((player) => {
+        const playerCardId = game.turnDeck.find(
+            (card) => card.owner.toString() === player.toString()
+        ).card.id;
+        const votesReceived = game.turnVotes.filter(
+            (vote) => vote.card.id === playerCardId
+        );
+        const pointsId = points.findIndex((el) => el.player === player);
+        const pointsObj = points[pointsId];
+        points[pointsId] = {
+            ...pointsObj,
+            points: pointsObj.points + votesReceived.length,
+        };
+    });
+    console.log("FINAL POINTS", points);
+    game.turnPoints = points;
+    game.gamePoints = points.map((el, idx) => {
+        let points;
+        if (game.gamePoints[idx]) {
+            points = el.points + game.gamePoints[idx].points;
+        } else {
+            points = el.points;
         }
-    })
+        return { ...el, points };
+    });
+    game.save();
+    return game;
+};
 
-
-
-    console.log(points)
-}
-
-module.exports = mongoose.model('Game', gameSchema)
-
-
-// gameSchema.methods.currentTurnIsOver = function() {
-    //     const turnCount = (+this.turn)+1;
-    //     return this.sketchbooks.every(
-    //         sketchbook => sketchbook.pages.length >= turnCount
-    //     );
-    // }
-    
-    // gameSchema.methods.isOver = function() {
-    //    return this.status === 'over' || +this.turn >= this.players.length
-    // }
-    
-    // const cacheKeyResolver = ({ _id, turn }) => `${_id}-${turn}`;
-    // const memoizedPublishTimeToSubmit = _.memoize(({ _id, turn }) => {
-    //     return new Promise((resolve) => {
-    //         //Odd means drawing mode - Even means guessing mode
-    //         const delay = (turn%2==0) ? 60000 : 90000
-    //         console.log("DELAY", delay) 
-    //         setTimeout(() => {
-    //             pubsub.publish("TIME_TO_SUBMIT", {
-    //                 timeToSubmit: {
-    //                     id: _id.toString(),
-    //                     turn: parseInt(turn, 10) - 1
-    //                 }
-    //             });
-    //             debug("LOOPING FROM SUBMITQUEUE!")
-    //             memoizedPublishTimeToSubmit.cache.delete(cacheKeyResolver({ _id, turn }));
-    //             resolve();
-    //         }, delay);
-    //     })
-    // }, cacheKeyResolver)
-    // gameSchema.statics.publishTimeToSubmit = memoizedPublishTimeToSubmit;
-    
-    // gameSchema.statics.checkCompletedTurn = async function (gameId) {
-    //     const game = await this.findById(gameId)
-    //         .populate('sketchbooks')
-    //         .populate('players')
-    
-    //     if(game.currentTurnIsOver()) {
-    //       debug('ALL RESPONSES RECEIVED CALLED FROM GAME STATIC METHOD')
-    //       game.turn=(+game.turn+1)
-    //       if(game.isOver()){
-    //         game.status="over";
-    //       }
-    //       await game.save()
-    //       pubsub.publish("GAME_UPDATE", { gameUpdate: game});
-    //       debug('ALL RESPONSES RECEIVED DONE')
-    //       this.publishTimeToSubmit(game);
-    //     }
-    // }
+module.exports = mongoose.model("Game", gameSchema);
