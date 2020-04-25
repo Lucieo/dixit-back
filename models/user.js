@@ -1,34 +1,35 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
-
 const userSchema = new Schema({
-    email:{
+    email: {
         type: String,
-        required: true
+        required: true,
     },
-    password:{
+    password: {
         type: String,
-        required: true
+        required: true,
     },
-    name:{
+    name: {
         type: String,
-        required: true
+        required: true,
     },
-    admin:{
+    admin: {
         type: Boolean,
-        default: false
+        default: false,
     },
     icon: {
         type: String,
-        default: 'monster1'
-    }
-    ,
-    totalPoints:{
+        default: "monster1",
+    },
+    totalPoints: {
         type: Number,
-        default: 0
-    }
-})
+        default: 0,
+    },
+    totalGames: {
+        type: Number,
+        default: 0,
+    },
+});
 
-
-module.exports = mongoose.model('User', userSchema)
+module.exports = mongoose.model("User", userSchema);

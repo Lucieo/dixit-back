@@ -72,7 +72,7 @@ module.exports = {
     getUser,
 };
 
-//addCards()
+//addCards();
 
 if (require.main === module) {
     const http = require("http");
@@ -82,7 +82,7 @@ if (require.main === module) {
     console.log(MONGO_URI);
     mongoose.connect(MONGO_URI).then((result) => {
         httpServer.listen({ port: process.env.PORT || 4000 }, () =>
-            debug(`🚀 Server ready`)
+            console.log(`🚀 Server ready`)
         );
     });
 }

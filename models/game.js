@@ -4,6 +4,10 @@ const Schema = mongoose.Schema;
 const pubsub = require("../schema/pubsub");
 const _ = require("lodash");
 const debug = require("debug")("esquisse:game");
+const Card = require("./card");
+const User = require("./user");
+const Deck = require("./deck");
+const { shuffle } = require("../utils");
 
 const gameSchema = new Schema({
     players: [
@@ -66,30 +70,60 @@ const gameSchema = new Schema({
 
 //
 
-gameSchema.statics.evaluateTurn = async function (gameId, turnMaster) {
-    const game = await this.findById(gameId)
-        .populate({
-            path: "turnDeck",
-            populate: {
-                path: "card",
-            },
-        })
-        .populate({
-            path: "turnVotes",
-            populate: {
-                path: "card",
-            },
+gameSchema.statics.endTurn = async function (game) {
+    const winner = game.gamePoints.find((point) => point.points >= 3);
+    const cardsLeft = Card.count() - game.distributedCards.length;
+    if (winner || cardsLeft < game.players.length) {
+        game.status = "over";
+        game.gamePoints.forEach(async (point) => {
+            console.log("USER TO LOOK FOR", point.player);
+            const user = await User.find({ point });
+            console.log("USER FOUND", user);
+            user.totalPoints += point.points;
+            user.totalGames += 1;
+            await user.save();
         });
+    } else {
+        //Get each player a new card
+        let selectedCards = await Card.find({
+            _id: { $nin: game.distributedCards },
+        });
+        selectedCards = shuffle(selectedCards).splice(0, game.players.length);
+        game.distributedCards = [...game.distributedCards, ...selectedCards];
+        game.players.forEach(async (owner) => {
+            const newCard = selectedCards.splice(0, 1)[0];
+            const deck = await Deck.findOne({ owner, gameId: game.id });
+            deck.cards = [...deck.cards, newCard._id];
+            await deck.save();
+        });
+        //Update Turn
+        game.turn =
+            +game.turn + 1 > game.players.length - 1 ? 0 : +game.turn + 1;
+        game.currentWord = "";
+        game.turnPoints = [];
+        game.turnDeck = [];
+        game.turnVotes = [];
+    }
+    game.save();
+};
 
-    const points = game.players.map((player) => ({ player, points: 0 }));
+gameSchema.statics.evaluateTurn = async function (game, turnMaster) {
+    const points = game.players.map((player) => ({
+        player: player._id,
+        points: 0,
+    }));
     const masterCardId = game.turnDeck.find(
         (card) => card.owner.toString() === turnMaster
-    );
+    ).card.id;
+
     const votesForMaster = game.turnVotes
-        .filter((vote) => vote.card.id === masterCardId)
+        .filter((vote) => {
+            return vote.card.id === masterCardId;
+        })
         .map((el) => el.owner);
     const hasMasterWon =
-        votesForMaster > 0 && votesForMaster < game.players.length - 1;
+        votesForMaster.length > 0 &&
+        votesForMaster.length < game.players.length - 1;
 
     if (hasMasterWon) {
         votesForMaster.push(turnMaster);
@@ -106,16 +140,13 @@ gameSchema.statics.evaluateTurn = async function (gameId, turnMaster) {
         });
     }
 
-    console.log("hasMasterWon", hasMasterWon);
-    console.log(points);
+    const otherPlayers = game.players
+        .filter((player) => player._id.toString() !== turnMaster)
+        .map((player) => player._id);
 
-    const otherPlayers = game.players.filter(
-        (player) => player.toString() !== turnMaster
-    );
-    console.log("OtherPlayers ", otherPlayers);
     otherPlayers.forEach((player) => {
         const playerCardId = game.turnDeck.find(
-            (card) => card.owner.toString() === player.toString()
+            (card) => card.owner.toString() === player._id.toString()
         ).card.id;
         const votesReceived = game.turnVotes.filter(
             (vote) => vote.card.id === playerCardId
@@ -127,7 +158,6 @@ gameSchema.statics.evaluateTurn = async function (gameId, turnMaster) {
             points: pointsObj.points + votesReceived.length,
         };
     });
-    console.log("FINAL POINTS", points);
     game.turnPoints = points;
     game.gamePoints = points.map((el, idx) => {
         let points;

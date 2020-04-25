@@ -4,6 +4,7 @@ const Game = require("../models/game");
 const Deck = require("../models/deck");
 const Card = require("../models/card");
 const Action = require("../models/action");
+const { shuffle } = require("../utils");
 
 const jwt = require("jsonwebtoken");
 const { withFilter } = require("apollo-server-express");
@@ -157,17 +158,6 @@ const resolvers = {
                     let selectedCards = await Card.find({
                         _id: { $nin: game.distributedCards },
                     });
-                    const shuffle = function (v) {
-                        for (
-                            var j, x, i = v.length;
-                            i;
-                            j = parseInt(Math.random() * i),
-                                x = v[--i],
-                                v[i] = v[j],
-                                v[j] = x
-                        );
-                        return v;
-                    };
                     selectedCards = shuffle(selectedCards);
                     game.players.forEach((owner) => {
                         const userCards = selectedCards.splice(0, 6);
@@ -178,6 +168,11 @@ const resolvers = {
                         });
                         deck.save();
                         game.decks.push(deck);
+                        const userCardsIds = userCards.map((card) => card._id);
+                        game.distributedCards = [
+                            ...game.distributedCards,
+                            ...userCardsIds,
+                        ];
                     });
                 }
                 game.save();
@@ -194,6 +189,11 @@ const resolvers = {
                 game: gameId,
             });
             await action.save();
+            userDeck = await Deck.findOne({ owner: user, gameId });
+            userDeck.cards = userDeck.cards.filter((card) => {
+                return card.toString() !== cardId;
+            });
+            await userDeck.save();
             const game = await Game.findById(gameId)
                 .populate("players")
                 .populate({
@@ -208,7 +208,9 @@ const resolvers = {
                         path: "card",
                     },
                 });
-            game.turnDeck.push(action);
+            if (game.turnDeck.indexOf(action) < 0) {
+                game.turnDeck.push(action);
+            }
             game.currentWord = currentWord;
             await game.save();
             pubsub.publish("GAME_UPDATE", { gameUpdate: game });
@@ -231,10 +233,19 @@ const resolvers = {
             const game = await Game.findById(gameId);
             if (actionType === "submitCard") {
                 //Select Card Action
-                game.turnDeck.push(action);
+                if (game.turnDeck.indexOf(action) < 0) {
+                    game.turnDeck.push(action);
+                    userDeck = await Deck.findOne({ owner: user, gameId });
+                    userDeck.cards = userDeck.cards.filter((card) => {
+                        return card.toString() !== cardId;
+                    });
+                    await userDeck.save();
+                }
             } else {
                 //Vote for Card Acton
-                game.turnVotes.push(action);
+                if (game.turnVotes.indexOf(action) < 0) {
+                    game.turnVotes.push(action);
+                }
             }
             await game.save();
             pubsub.publish("GAME_ACTION", {
@@ -251,27 +262,25 @@ const resolvers = {
             { gameId, step, turnMaster },
             { user }
         ) => {
-            let game;
+            let game = await Game.findById(gameId)
+                .populate("players")
+                .populate({
+                    path: "turnDeck",
+                    populate: {
+                        path: "card",
+                    },
+                })
+                .populate({
+                    path: "turnVotes",
+                    populate: {
+                        path: "card",
+                    },
+                });
             if (step === "launchEvaluation") {
-                console.log("evaluate");
-                game = await Game.evaluateTurn(gameId, turnMaster);
-            } else {
-                game = await Game.findById(gameId)
-                    .populate("players")
-                    .populate({
-                        path: "turnDeck",
-                        populate: {
-                            path: "card",
-                        },
-                    })
-                    .populate({
-                        path: "turnVotes",
-                        populate: {
-                            path: "card",
-                        },
-                    });
+                await Game.evaluateTurn(game, turnMaster);
+            } else if (step === "nextTurn") {
+                await Game.endTurn(game);
             }
-            //console.log(game);
             pubsub.publish("GAME_UPDATE", { gameUpdate: game });
             return game;
         },
@@ -304,14 +313,9 @@ const resolvers = {
         gameAction: {
             subscribe: withFilter(
                 () => {
-                    console.log("GAME ACTION SUBSCRIPTION DONE");
                     return pubsub.asyncIterator(["GAME_ACTION"]);
                 },
                 (payload, variables) => {
-                    console.log(
-                        "GAME ACTION CALLED should pass ",
-                        payload.gameAction.gameId === variables.gameId
-                    );
                     return payload.gameAction.gameId === variables.gameId;
                 }
             ),

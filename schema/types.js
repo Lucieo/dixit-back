@@ -6,6 +6,8 @@ const typeDefs = gql`
         name: String
         email: String
         icon: String
+        totalPoints: Int
+        totalGames: Int
     }
     type LoginResponse {
         token: String
