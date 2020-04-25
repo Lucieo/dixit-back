@@ -61,24 +61,22 @@ const gameSchema = new Schema({
     turnPoints: {
         type: Array,
     },
-    // createdAt: {
-    //     type: Date,
-    //     expires: 150000,
-    //     default: Date.now
-    // }
+    createdAt: {
+        type: Date,
+        expires: 43200,
+        default: Date.now,
+    },
 });
 
 //
 
 gameSchema.statics.endTurn = async function (game) {
-    const winner = game.gamePoints.find((point) => point.points >= 3);
+    const winner = game.gamePoints.find((point) => point.points >= 30);
     const cardsLeft = Card.count() - game.distributedCards.length;
     if (winner || cardsLeft < game.players.length) {
         game.status = "over";
         game.gamePoints.forEach(async (point) => {
-            console.log("USER TO LOOK FOR", point.player);
-            const user = await User.find({ point });
-            console.log("USER FOUND", user);
+            const user = await User.findById(point.player.toString());
             user.totalPoints += point.points;
             user.totalGames += 1;
             await user.save();
@@ -88,7 +86,10 @@ gameSchema.statics.endTurn = async function (game) {
         let selectedCards = await Card.find({
             _id: { $nin: game.distributedCards },
         });
-        selectedCards = shuffle(selectedCards).splice(0, game.players.length);
+        selectedCards = shuffle(selectedCards);
+        console.log("SELECTED CARDS LENGHT ", selectedCards.length);
+        console.log("SELECTED CARDS FIRST ", selectedCards.slice(0, 5));
+        selectedCards = selectedCards.splice(0, game.players.length);
         game.distributedCards = [...game.distributedCards, ...selectedCards];
         game.players.forEach(async (owner) => {
             const newCard = selectedCards.splice(0, 1)[0];

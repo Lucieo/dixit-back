@@ -1,28 +1,27 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
 const actionSchema = new Schema({
-    game:{
+    game: {
         type: Schema.Types.ObjectId,
-        ref: 'Game'
+        ref: "Game",
     },
     owner: {
         type: Schema.Types.ObjectId,
-        ref: 'User'
+        ref: "User",
     },
     actionType: {
-        type: String
+        type: String,
     },
-    card:{
+    card: {
         type: Schema.Types.ObjectId,
-        ref: 'Card'
+        ref: "Card",
     },
-    // createdAt: { 
-    //     type: Date, 
-    //     expires: 150000,
-    //     default: Date.now
-    // }
-})
+    createdAt: {
+        type: Date,
+        expires: 43200,
+        default: Date.now,
+    },
+});
 
-
-module.exports = mongoose.model('Action', actionSchema)
+module.exports = mongoose.model("Action", actionSchema);
