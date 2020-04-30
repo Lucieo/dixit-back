@@ -15,7 +15,6 @@ app.use("/images", express.static(path.join(__dirname, "images")));
 
 app.use(json({ limit: "2mb" }));
 const { MONGO_URI } = process.env;
-debug(MONGO_URI);
 
 app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
