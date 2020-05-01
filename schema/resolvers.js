@@ -159,11 +159,6 @@ const resolvers = {
                         _id: { $nin: game.distributedCards },
                     });
                     selectedCards = shuffle(selectedCards);
-                    console.log("SELECTED CARDS LENGHT ", selectedCards.length);
-                    console.log(
-                        "SELECTED CARDS FIRST ",
-                        selectedCards.slice(5)
-                    );
                     game.players.forEach((owner) => {
                         const userCards = selectedCards.splice(0, 6);
                         const deck = new Deck({

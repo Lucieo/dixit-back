@@ -71,7 +71,7 @@ const gameSchema = new Schema({
 //
 
 gameSchema.statics.endTurn = async function (game) {
-    const winner = game.gamePoints.find((point) => point.points >= 30);
+    const winner = game.gamePoints.find((point) => point.points >= 25);
     const cardsLeft = Card.count() - game.distributedCards.length;
     if (winner || cardsLeft < game.players.length) {
         game.status = "over";
@@ -87,8 +87,6 @@ gameSchema.statics.endTurn = async function (game) {
             _id: { $nin: game.distributedCards },
         });
         selectedCards = shuffle(selectedCards);
-        console.log("SELECTED CARDS LENGHT ", selectedCards.length);
-        console.log("SELECTED CARDS FIRST ", selectedCards.slice(0, 5));
         selectedCards = selectedCards.splice(0, game.players.length);
         game.distributedCards = [...game.distributedCards, ...selectedCards];
         game.players.forEach(async (owner) => {
