@@ -37,6 +37,7 @@ const typeDefs = gql`
         currentWord: String
         turnPoints: [PointDetail]
         gamePoints: [PointDetail]
+        step: String
     }
     type CreatedGame {
         id: ID

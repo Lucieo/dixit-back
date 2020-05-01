@@ -212,6 +212,7 @@ const resolvers = {
                 game.turnDeck.push(action);
             }
             game.currentWord = currentWord;
+            game.step = "select";
             await game.save();
             pubsub.publish("GAME_UPDATE", { gameUpdate: game });
             return { gameId, step: "init", status: "Game initiated" };
@@ -276,10 +277,14 @@ const resolvers = {
                         path: "card",
                     },
                 });
-            if (step === "launchEvaluation") {
+            if (step === "launchVote") {
+                game.step = "vote";
+            } else if (step === "launchEvaluation") {
                 await Game.evaluateTurn(game, turnMaster);
+                game.step = "evaluate";
             } else if (step === "nextTurn") {
                 await Game.endTurn(game);
+                game.step = "init";
             }
             pubsub.publish("GAME_UPDATE", { gameUpdate: game });
             return game;

@@ -24,6 +24,10 @@ const gameSchema = new Schema({
         type: String,
         default: "new",
     },
+    step: {
+        type: String,
+        default: "init",
+    },
     turn: {
         type: String,
         default: 0,
