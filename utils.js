@@ -1,10 +1,9 @@
-const shuffle = function (v) {
-    for (
-        var j, x, i = v.length;
-        i;
-        j = parseInt(Math.random() * i), x = v[--i], v[i] = v[j], v[j] = x
-    );
-    return v;
+const shuffle = function (a) {
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
 };
 
 exports.shuffle = shuffle;

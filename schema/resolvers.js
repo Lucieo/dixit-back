@@ -158,7 +158,10 @@ const resolvers = {
                     let selectedCards = await Card.find({
                         _id: { $nin: game.distributedCards },
                     });
-                    selectedCards = shuffle(selectedCards);
+                    //selectedCards = shuffle(selectedCards);
+                    selectedCards.sort(function () {
+                        return 0.5 - Math.random();
+                    });
                     game.players.forEach((owner) => {
                         const userCards = selectedCards.splice(0, 6);
                         const deck = new Deck({
@@ -279,12 +282,13 @@ const resolvers = {
                 });
             if (step === "launchVote") {
                 game.step = "vote";
+                await game.save();
             } else if (step === "launchEvaluation") {
-                await Game.evaluateTurn(game, turnMaster);
                 game.step = "evaluate";
+                await Game.evaluateTurn(game, turnMaster);
             } else if (step === "nextTurn") {
-                await Game.endTurn(game);
                 game.step = "init";
+                await Game.endTurn(game);
             }
             pubsub.publish("GAME_UPDATE", { gameUpdate: game });
             return game;
